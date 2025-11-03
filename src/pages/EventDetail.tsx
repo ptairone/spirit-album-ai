@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import MediaViewer from "@/components/MediaViewer";
+import AIPhotoSearch from "@/components/AIPhotoSearch";
 
 interface Event {
   id: string;
@@ -34,6 +35,8 @@ const EventDetail = () => {
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [filteredMedia, setFilteredMedia] = useState<Media[]>([]);
+  const [isFiltering, setIsFiltering] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -55,7 +58,10 @@ const EventDetail = () => {
       .order('created_at', { ascending: false });
 
     if (eventData) setEvent(eventData);
-    if (mediaData) setMedia(mediaData);
+    if (mediaData) {
+      setMedia(mediaData);
+      setFilteredMedia(mediaData);
+    }
     setLoading(false);
   };
 
@@ -89,6 +95,22 @@ const EventDetail = () => {
   const openViewer = (index: number) => {
     setCurrentMediaIndex(index);
     setViewerOpen(true);
+  };
+
+  const handleSearchResults = (mediaIds: string[]) => {
+    if (mediaIds.length === 0) {
+      setFilteredMedia(media);
+      setIsFiltering(false);
+    } else {
+      const filtered = media.filter(m => mediaIds.includes(m.id));
+      setFilteredMedia(filtered);
+      setIsFiltering(true);
+    }
+  };
+
+  const clearFilter = () => {
+    setFilteredMedia(media);
+    setIsFiltering(false);
   };
 
   if (loading) {
@@ -137,6 +159,21 @@ const EventDetail = () => {
           </div>
         </div>
 
+        {id && <AIPhotoSearch eventId={id} onSearchResults={handleSearchResults} />}
+
+        {isFiltering && (
+          <Card className="p-4 mb-6 animate-fade-in bg-accent/10">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">
+                Mostrando {filteredMedia.length} foto(s) da busca
+              </p>
+              <Button variant="outline" size="sm" onClick={clearFilter}>
+                Limpar Filtro
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {selectedMedia.length > 0 && (
           <Card className="p-4 mb-6 animate-fade-in">
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -163,18 +200,18 @@ const EventDetail = () => {
           </Card>
         )}
 
-        {media.length === 0 ? (
+        {filteredMedia.length === 0 ? (
           <Card className="text-center py-12 animate-fade-in">
             <div className="flex flex-col items-center space-y-4">
               <ImageIcon className="h-16 w-16 text-muted-foreground" />
               <p className="text-lg text-muted-foreground">
-                Nenhuma foto ou vídeo adicionado ainda
+                {isFiltering ? 'Nenhuma foto encontrada com essa busca' : 'Nenhuma foto ou vídeo adicionado ainda'}
               </p>
             </div>
           </Card>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {media.map((item, index) => (
+            {filteredMedia.map((item, index) => (
               <div
                 key={item.id}
                 className={`relative group cursor-pointer animate-fade-in ${
