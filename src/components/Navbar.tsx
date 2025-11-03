@@ -34,12 +34,13 @@ const Navbar = () => {
 
   const checkAdminStatus = async (userId: string) => {
     const { data } = await supabase
-      .from('profiles')
+      .from('user_roles')
       .select('role')
-      .eq('id', userId)
-      .single();
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .maybeSingle();
     
-    setIsAdmin(data?.role === 'admin');
+    setIsAdmin(!!data);
   };
 
   const handleLogout = async () => {

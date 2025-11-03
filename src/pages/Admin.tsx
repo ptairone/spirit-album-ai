@@ -35,13 +35,14 @@ const Admin = () => {
       return;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
+    const { data: userRole } = await supabase
+      .from('user_roles')
       .select('role')
-      .eq('id', session.user.id)
-      .single();
+      .eq('user_id', session.user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
 
-    if (profile?.role !== 'admin') {
+    if (!userRole) {
       toast.error("Acesso negado. Apenas administradores podem acessar esta página.");
       navigate("/");
       return;
