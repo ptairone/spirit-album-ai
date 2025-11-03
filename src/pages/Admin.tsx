@@ -6,14 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Upload, Loader2 } from "lucide-react";
+import { Calendar, Upload, Loader2, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
+import BulkMediaUploader from "@/components/BulkMediaUploader";
 
 const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const navigate = useNavigate();
 
   // Event form state
@@ -110,38 +112,61 @@ const Admin = () => {
 
       if (eventError) throw eventError;
 
-      // Upload media files
+      // Upload media files with progress tracking
       if (mediaFiles.length > 0) {
         toast.info(`Enviando ${mediaFiles.length} arquivo(s)...`);
         
-        for (const file of mediaFiles) {
-          const fileExt = file.name.split('.').pop();
-          const filePath = `${event.id}/${Date.now()}-${file.name}`;
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = 0; i < mediaFiles.length; i++) {
+          const file = mediaFiles[i];
+          const fileKey = `${file.name}-${i}`;
           
-          const { data: fileData, error: uploadError } = await supabase.storage
-            .from('event-media')
-            .upload(filePath, file);
+          try {
+            setUploadProgress(prev => ({ ...prev, [fileKey]: 0 }));
 
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            continue;
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${event.id}/${Date.now()}-${file.name}`;
+            
+            const { data: fileData, error: uploadError } = await supabase.storage
+              .from('event-media')
+              .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            setUploadProgress(prev => ({ ...prev, [fileKey]: 50 }));
+
+            const { data: { publicUrl } } = supabase.storage
+              .from('event-media')
+              .getPublicUrl(fileData.path);
+
+            const fileType = file.type.startsWith('video/') ? 'video' : 'photo';
+
+            await supabase
+              .from('media')
+              .insert({
+                event_id: event.id,
+                file_url: publicUrl,
+                file_type: fileType,
+                file_size: file.size,
+                uploaded_by: session.user.id
+              });
+
+            setUploadProgress(prev => ({ ...prev, [fileKey]: 100 }));
+            successCount++;
+          } catch (error) {
+            console.error(`Erro ao enviar ${file.name}:`, error);
+            errorCount++;
+            setUploadProgress(prev => ({ ...prev, [fileKey]: -1 }));
           }
+        }
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('event-media')
-            .getPublicUrl(fileData.path);
-
-          const fileType = file.type.startsWith('video/') ? 'video' : 'photo';
-
-          await supabase
-            .from('media')
-            .insert({
-              event_id: event.id,
-              file_url: publicUrl,
-              file_type: fileType,
-              file_size: file.size,
-              uploaded_by: session.user.id
-            });
+        if (successCount > 0) {
+          toast.success(`${successCount} arquivo(s) enviado(s) com sucesso!`);
+        }
+        if (errorCount > 0) {
+          toast.error(`${errorCount} arquivo(s) falharam no upload`);
         }
       }
 
@@ -153,6 +178,7 @@ const Admin = () => {
       setEventDate("");
       setCoverImage(null);
       setMediaFiles([]);
+      setUploadProgress({});
       
       // Navigate to the event
       navigate(`/eventos/${event.id}`);
@@ -247,19 +273,11 @@ const Admin = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="mediaFiles">Fotos e Vídeos</Label>
-                <Input
-                  id="mediaFiles"
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={handleMediaFilesChange}
+                <Label>Fotos e Vídeos em Massa</Label>
+                <BulkMediaUploader
+                  onFilesChange={setMediaFiles}
+                  selectedFiles={mediaFiles}
                 />
-                {mediaFiles.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {mediaFiles.length} arquivo(s) selecionado(s)
-                  </p>
-                )}
               </div>
 
               <Button type="submit" className="w-full" disabled={uploading}>
