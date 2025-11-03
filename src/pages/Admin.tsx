@@ -6,10 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Upload, Loader2, CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar, Upload, Loader2, CheckCircle2, ImagePlus, Trash2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import BulkMediaUploader from "@/components/BulkMediaUploader";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -25,8 +28,15 @@ const Admin = () => {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
 
+  // Existing events state
+  const [events, setEvents] = useState<any[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadMediaFiles, setUploadMediaFiles] = useState<File[]>([]);
+
   useEffect(() => {
     checkAdminAccess();
+    fetchEvents();
   }, []);
 
   const checkAdminAccess = async () => {
@@ -52,6 +62,114 @@ const Admin = () => {
 
     setIsAdmin(true);
     setLoading(false);
+  };
+
+  const fetchEvents = async () => {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('event_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching events:', error);
+      toast.error("Erro ao carregar eventos");
+      return;
+    }
+
+    setEvents(data || []);
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este evento?")) return;
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      toast.error("Erro ao excluir evento");
+      return;
+    }
+
+    toast.success("Evento excluído com sucesso");
+    fetchEvents();
+  };
+
+  const openUploadDialog = (event: any) => {
+    setSelectedEvent(event);
+    setUploadMediaFiles([]);
+    setIsUploadDialogOpen(true);
+  };
+
+  const handleUploadToExistingEvent = async () => {
+    if (!selectedEvent || uploadMediaFiles.length === 0) return;
+
+    setUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Você precisa estar logado");
+        return;
+      }
+
+      toast.info(`Enviando ${uploadMediaFiles.length} arquivo(s)...`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 0; i < uploadMediaFiles.length; i++) {
+        const file = uploadMediaFiles[i];
+        
+        try {
+          const fileExt = file.name.split('.').pop();
+          const filePath = `${selectedEvent.id}/${Date.now()}-${file.name}`;
+          
+          const { data: fileData, error: uploadError } = await supabase.storage
+            .from('event-media')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('event-media')
+            .getPublicUrl(fileData.path);
+
+          const fileType = file.type.startsWith('video/') ? 'video' : 'photo';
+
+          await supabase
+            .from('media')
+            .insert({
+              event_id: selectedEvent.id,
+              file_url: publicUrl,
+              file_type: fileType,
+              file_size: file.size,
+              uploaded_by: session.user.id
+            });
+
+          successCount++;
+        } catch (error) {
+          console.error(`Erro ao enviar ${file.name}:`, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} arquivo(s) enviado(s) com sucesso!`);
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} arquivo(s) falharam no upload`);
+      }
+
+      setIsUploadDialogOpen(false);
+      setUploadMediaFiles([]);
+      setSelectedEvent(null);
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast.error(error.message || "Erro ao enviar mídias");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,6 +298,9 @@ const Admin = () => {
       setMediaFiles([]);
       setUploadProgress({});
       
+      // Refresh events list
+      fetchEvents();
+      
       // Navigate to the event
       navigate(`/eventos/${event.id}`);
     } catch (error: any) {
@@ -296,7 +417,98 @@ const Admin = () => {
             </form>
           </CardContent>
         </Card>
+
+        {/* Existing Events */}
+        {events.length > 0 && (
+          <Card className="mt-8 shadow-medium animate-fade-in">
+            <CardHeader>
+              <CardTitle>Eventos Criados</CardTitle>
+              <CardDescription>
+                Adicione mídias ou gerencie eventos existentes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {events.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <h3 className="font-semibold">{event.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(event.event_date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openUploadDialog(event)}
+                      >
+                        <ImagePlus className="h-4 w-4 mr-2" />
+                        Adicionar Mídias
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteEvent(event.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Upload to Existing Event Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Adicionar Mídias</DialogTitle>
+            <DialogDescription>
+              Envie fotos e vídeos para {selectedEvent?.title}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <BulkMediaUploader
+              onFilesChange={setUploadMediaFiles}
+              selectedFiles={uploadMediaFiles}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsUploadDialogOpen(false)}
+              disabled={uploading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUploadToExistingEvent}
+              disabled={uploading || uploadMediaFiles.length === 0}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Enviar {uploadMediaFiles.length} arquivo(s)
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
