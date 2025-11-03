@@ -75,10 +75,16 @@ const Navbar = () => {
               <span>Eventos</span>
             </Link>
             {isAdmin && (
-              <Link to="/admin" className="flex items-center space-x-2 text-sm font-medium transition-smooth hover:text-primary">
-                <Shield className="h-4 w-4" />
-                <span>Admin</span>
-              </Link>
+              <>
+                <Link to="/admin" className="flex items-center space-x-2 text-sm font-medium transition-smooth hover:text-primary">
+                  <Shield className="h-4 w-4" />
+                  <span>Admin</span>
+                </Link>
+                <Link to="/admin/usuarios" className="flex items-center space-x-2 text-sm font-medium transition-smooth hover:text-primary">
+                  <UserIcon className="h-4 w-4" />
+                  <span>Usuários</span>
+                </Link>
+              </>
             )}
           </div>
 
@@ -129,14 +135,24 @@ const Navbar = () => {
               <span>Eventos</span>
             </Link>
             {isAdmin && (
-              <Link
-                to="/admin"
-                className="flex items-center space-x-2 py-2 text-sm font-medium transition-smooth hover:text-primary"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <Shield className="h-4 w-4" />
-                <span>Admin</span>
-              </Link>
+              <>
+                <Link
+                  to="/admin"
+                  className="flex items-center space-x-2 py-2 text-sm font-medium transition-smooth hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>Admin</span>
+                </Link>
+                <Link
+                  to="/admin/usuarios"
+                  className="flex items-center space-x-2 py-2 text-sm font-medium transition-smooth hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <UserIcon className="h-4 w-4" />
+                  <span>Usuários</span>
+                </Link>
+              </>
             )}
             <div className="pt-2 border-t border-border">
               {user ? (
