@@ -96,43 +96,27 @@ const UserManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      // Get all profiles with their roles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, full_name, created_at");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      if (profilesError) throw profilesError;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: 'list' }),
+        }
+      );
 
-      // Get all user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-
-      if (rolesError) throw rolesError;
-
-      // Get user emails from auth
-      const { data, error: authError } = await supabase.auth.admin.listUsers();
-      const authUsers = data?.users || [];
-
-      if (authError) {
-        console.error("Error fetching auth users:", authError);
+      if (!response.ok) {
+        throw new Error('Falha ao carregar usuários');
       }
 
-      // Combine the data
-      const usersWithRoles: UserWithRole[] = (profiles || []).map(profile => {
-        const userRole = roles?.find(r => r.user_id === profile.id);
-        const authUser = authUsers.find(u => u.id === profile.id);
-        
-        return {
-          id: profile.id,
-          email: authUser?.email || "Email não disponível",
-          full_name: profile.full_name,
-          role: (userRole?.role === "admin" ? "admin" : "user") as "admin" | "user",
-          created_at: profile.created_at,
-        };
-      });
-
-      setUsers(usersWithRoles);
+      const { users: fetchedUsers } = await response.json();
+      setUsers(fetchedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       toast({
@@ -148,27 +132,30 @@ const UserManagement = () => {
     setIsCreatingUser(true);
 
     try {
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: fullName,
-        },
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
 
-      if (authError) throw authError;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'create',
+            email,
+            password,
+            fullName,
+            role: selectedRole,
+          }),
+        }
+      );
 
-      // The trigger will create the profile and default user role
-      // If we need admin role, update it
-      if (selectedRole === "admin" && authData.user) {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .update({ role: "admin" })
-          .eq("user_id", authData.user.id);
-
-        if (roleError) throw roleError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao criar usuário');
       }
 
       toast({
@@ -199,12 +186,28 @@ const UserManagement = () => {
 
   const handleChangeRole = async (userId: string, newRole: "admin" | "user") => {
     try {
-      const { error } = await supabase
-        .from("user_roles")
-        .update({ role: newRole })
-        .eq("user_id", userId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'update-role',
+            userId,
+            role: newRole,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Falha ao atualizar permissão');
+      }
 
       toast({
         title: "Permissão atualizada",
@@ -224,9 +227,27 @@ const UserManagement = () => {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'delete',
+            userId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Falha ao remover usuário');
+      }
 
       toast({
         title: "Usuário removido",
