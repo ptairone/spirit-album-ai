@@ -3,6 +3,9 @@ import { X, Upload, Image, Video, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface MediaFile {
   file: File;
@@ -10,14 +13,17 @@ interface MediaFile {
   progress: number;
   uploaded: boolean;
   error?: string;
+  name?: string;
+  description?: string;
 }
 
 interface BulkMediaUploaderProps {
-  onFilesChange: (files: File[]) => void;
+  onFilesChange: (files: File[], metadata?: { name?: string; description?: string }[]) => void;
   selectedFiles: File[];
+  metadata?: { name?: string; description?: string }[];
 }
 
-const BulkMediaUploader = ({ onFilesChange, selectedFiles }: BulkMediaUploaderProps) => {
+const BulkMediaUploader = ({ onFilesChange, selectedFiles, metadata = [] }: BulkMediaUploaderProps) => {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -74,8 +80,22 @@ const BulkMediaUploader = ({ onFilesChange, selectedFiles }: BulkMediaUploaderPr
     });
 
     const newSelectedFiles = [...selectedFiles];
+    const newMetadata = [...metadata];
     newSelectedFiles.splice(index, 1);
-    onFilesChange(newSelectedFiles);
+    newMetadata.splice(index, 1);
+    onFilesChange(newSelectedFiles, newMetadata);
+  };
+
+  const updateMetadata = (index: number, field: 'name' | 'description', value: string) => {
+    setMediaFiles(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+
+    const newMetadata = [...metadata];
+    newMetadata[index] = { ...newMetadata[index], [field]: value };
+    onFilesChange(selectedFiles, newMetadata);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -138,46 +158,83 @@ const BulkMediaUploader = ({ onFilesChange, selectedFiles }: BulkMediaUploaderPr
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="space-y-4">
             {mediaFiles.map((mediaFile, index) => (
-              <Card key={index} className="relative overflow-hidden group">
-                <div className="aspect-square relative bg-muted">
-                  {mediaFile.file.type.startsWith('image/') ? (
-                    <img
-                      src={mediaFile.preview}
-                      alt={mediaFile.file.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center">
-                      <Video className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-xs text-muted-foreground px-2 text-center truncate w-full">
-                        {mediaFile.file.name}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Remove button */}
-                  <button
-                    onClick={() => removeFile(index)}
-                    className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:scale-110"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-
-                  {/* File info overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2 text-xs space-y-1">
-                    <p className="truncate font-medium">{mediaFile.file.name}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/70">
-                        {formatFileSize(mediaFile.file.size)}
-                      </span>
+              <Card key={index} className="p-4">
+                <div className="flex gap-4">
+                  {/* Preview */}
+                  <div className="relative group flex-shrink-0">
+                    <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted">
                       {mediaFile.file.type.startsWith('image/') ? (
-                        <Image className="h-3 w-3" />
+                        <img
+                          src={mediaFile.preview}
+                          alt={mediaFile.file.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
-                        <Video className="h-3 w-3" />
+                        <div className="w-full h-full flex flex-col items-center justify-center">
+                          <Video className="h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="text-xs text-muted-foreground px-2 text-center">
+                            Vídeo
+                          </p>
+                        </div>
                       )}
                     </div>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="absolute -top-2 -right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:scale-110"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Metadata form - only for videos */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2">
+                      {mediaFile.file.type.startsWith('image/') ? (
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Video className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {formatFileSize(mediaFile.file.size)}
+                      </span>
+                    </div>
+
+                    {mediaFile.file.type.startsWith('video/') && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor={`name-${index}`} className="text-sm">
+                            Nome do vídeo
+                          </Label>
+                          <Input
+                            id={`name-${index}`}
+                            placeholder="Ex: Momento da chegada"
+                            value={mediaFile.name || ''}
+                            onChange={(e) => updateMetadata(index, 'name', e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`description-${index}`} className="text-sm">
+                            Descrição
+                          </Label>
+                          <Textarea
+                            id={`description-${index}`}
+                            placeholder="Descreva o momento do vídeo..."
+                            rows={2}
+                            value={mediaFile.description || ''}
+                            onChange={(e) => updateMetadata(index, 'description', e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {mediaFile.file.type.startsWith('image/') && (
+                      <p className="text-sm text-muted-foreground italic">
+                        {mediaFile.file.name}
+                      </p>
+                    )}
                   </div>
                 </div>
               </Card>

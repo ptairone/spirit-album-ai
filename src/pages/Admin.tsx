@@ -27,12 +27,14 @@ const Admin = () => {
   const [eventDate, setEventDate] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaMetadata, setMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
 
   // Existing events state
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadMediaFiles, setUploadMediaFiles] = useState<File[]>([]);
+  const [uploadMediaMetadata, setUploadMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
 
   useEffect(() => {
     checkAdminAccess();
@@ -99,6 +101,7 @@ const Admin = () => {
   const openUploadDialog = (event: any) => {
     setSelectedEvent(event);
     setUploadMediaFiles([]);
+    setUploadMediaMetadata([]);
     setIsUploadDialogOpen(true);
   };
 
@@ -136,6 +139,7 @@ const Admin = () => {
             .getPublicUrl(fileData.path);
 
           const fileType = file.type.startsWith('video/') ? 'video' : 'photo';
+          const meta = uploadMediaMetadata[i] || {};
 
           await supabase
             .from('media')
@@ -144,7 +148,9 @@ const Admin = () => {
               file_url: publicUrl,
               file_type: fileType,
               file_size: file.size,
-              uploaded_by: session.user.id
+              uploaded_by: session.user.id,
+              name: meta.name || null,
+              description: meta.description || null
             });
 
           successCount++;
@@ -163,6 +169,7 @@ const Admin = () => {
 
       setIsUploadDialogOpen(false);
       setUploadMediaFiles([]);
+      setUploadMediaMetadata([]);
       setSelectedEvent(null);
     } catch (error: any) {
       console.error('Error:', error);
@@ -260,6 +267,7 @@ const Admin = () => {
               .getPublicUrl(fileData.path);
 
             const fileType = file.type.startsWith('video/') ? 'video' : 'photo';
+            const meta = mediaMetadata[i] || {};
 
             await supabase
               .from('media')
@@ -268,7 +276,9 @@ const Admin = () => {
                 file_url: publicUrl,
                 file_type: fileType,
                 file_size: file.size,
-                uploaded_by: session.user.id
+                uploaded_by: session.user.id,
+                name: meta.name || null,
+                description: meta.description || null
               });
 
             setUploadProgress(prev => ({ ...prev, [fileKey]: 100 }));
@@ -296,6 +306,7 @@ const Admin = () => {
       setEventDate("");
       setCoverImage(null);
       setMediaFiles([]);
+      setMediaMetadata([]);
       setUploadProgress({});
       
       // Refresh events list
@@ -396,8 +407,12 @@ const Admin = () => {
               <div className="space-y-2">
                 <Label>Fotos e Vídeos em Massa</Label>
                 <BulkMediaUploader
-                  onFilesChange={setMediaFiles}
+                  onFilesChange={(files, meta) => {
+                    setMediaFiles(files);
+                    setMediaMetadata(meta || []);
+                  }}
                   selectedFiles={mediaFiles}
+                  metadata={mediaMetadata}
                 />
               </div>
 
@@ -477,8 +492,12 @@ const Admin = () => {
           
           <div className="space-y-4 py-4">
             <BulkMediaUploader
-              onFilesChange={setUploadMediaFiles}
+              onFilesChange={(files, meta) => {
+                setUploadMediaFiles(files);
+                setUploadMediaMetadata(meta || []);
+              }}
               selectedFiles={uploadMediaFiles}
+              metadata={uploadMediaMetadata}
             />
           </div>
 

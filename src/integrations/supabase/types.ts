@@ -82,6 +82,7 @@ export type Database = {
       media: {
         Row: {
           created_at: string
+          description: string | null
           duration: number | null
           event_id: string
           file_size: number | null
@@ -89,12 +90,14 @@ export type Database = {
           file_url: string
           height: number | null
           id: string
+          name: string | null
           thumbnail_url: string | null
           uploaded_by: string
           width: number | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
           duration?: number | null
           event_id: string
           file_size?: number | null
@@ -102,12 +105,14 @@ export type Database = {
           file_url: string
           height?: number | null
           id?: string
+          name?: string | null
           thumbnail_url?: string | null
           uploaded_by: string
           width?: number | null
         }
         Update: {
           created_at?: string
+          description?: string | null
           duration?: number | null
           event_id?: string
           file_size?: number | null
@@ -115,6 +120,7 @@ export type Database = {
           file_url?: string
           height?: number | null
           id?: string
+          name?: string | null
           thumbnail_url?: string | null
           uploaded_by?: string
           width?: number | null
