@@ -36,6 +36,7 @@ const Admin = () => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadMediaFiles, setUploadMediaFiles] = useState<File[]>([]);
   const [uploadMediaMetadata, setUploadMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
+  const [uploadExternalVideos, setUploadExternalVideos] = useState<ExternalVideo[]>([]);
   
   // External videos state
   const [externalVideos, setExternalVideos] = useState<ExternalVideo[]>([]);
@@ -106,11 +107,12 @@ const Admin = () => {
     setSelectedEvent(event);
     setUploadMediaFiles([]);
     setUploadMediaMetadata([]);
+    setUploadExternalVideos([]);
     setIsUploadDialogOpen(true);
   };
 
   const handleUploadToExistingEvent = async () => {
-    if (!selectedEvent || uploadMediaFiles.length === 0) return;
+    if (!selectedEvent || (uploadMediaFiles.length === 0 && uploadExternalVideos.length === 0)) return;
 
     setUploading(true);
     try {
@@ -120,11 +122,13 @@ const Admin = () => {
         return;
       }
 
-      toast.info(`Enviando ${uploadMediaFiles.length} arquivo(s)...`);
+      const totalItems = uploadMediaFiles.length + uploadExternalVideos.length;
+      toast.info(`Enviando ${totalItems} item(s)...`);
       
-      let successCount = 0;
-      let errorCount = 0;
+      let fileSuccessCount = 0;
+      let fileErrorCount = 0;
 
+      // Upload files
       for (let i = 0; i < uploadMediaFiles.length; i++) {
         const file = uploadMediaFiles[i];
         
@@ -157,23 +161,45 @@ const Admin = () => {
               description: meta.description || null
             });
 
-          successCount++;
+          fileSuccessCount++;
         } catch (error) {
           console.error(`Erro ao enviar ${file.name}:`, error);
-          errorCount++;
+          fileErrorCount++;
         }
       }
 
-      if (successCount > 0) {
-        toast.success(`${successCount} arquivo(s) enviado(s) com sucesso!`);
+      // Insert external videos from Google Drive
+      if (uploadExternalVideos.length > 0) {
+        try {
+          const externalVideoInserts = uploadExternalVideos.map(video => ({
+            event_id: selectedEvent.id,
+            file_url: video.driveLink,
+            file_type: 'video',
+            uploaded_by: session.user.id,
+            name: video.name,
+            description: video.description || null,
+            is_external: true
+          }));
+
+          await supabase.from('media').insert(externalVideoInserts);
+          toast.success(`${uploadExternalVideos.length} vídeo(s) do Google Drive adicionado(s)!`);
+        } catch (error) {
+          console.error('Erro ao adicionar vídeos externos:', error);
+          toast.error('Erro ao adicionar vídeos do Google Drive');
+        }
       }
-      if (errorCount > 0) {
-        toast.error(`${errorCount} arquivo(s) falharam no upload`);
+
+      if (fileSuccessCount > 0) {
+        toast.success(`${fileSuccessCount} arquivo(s) enviado(s) com sucesso!`);
+      }
+      if (fileErrorCount > 0) {
+        toast.error(`${fileErrorCount} arquivo(s) falharam no upload`);
       }
 
       setIsUploadDialogOpen(false);
       setUploadMediaFiles([]);
       setUploadMediaMetadata([]);
+      setUploadExternalVideos([]);
       setSelectedEvent(null);
     } catch (error: any) {
       console.error('Error:', error);
@@ -517,19 +543,32 @@ const Admin = () => {
           <DialogHeader>
             <DialogTitle>Adicionar Mídias</DialogTitle>
             <DialogDescription>
-              Envie fotos e vídeos para {selectedEvent?.title}
+              Envie fotos, vídeos e links do Google Drive para {selectedEvent?.title}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <BulkMediaUploader
-              onFilesChange={(files, meta) => {
-                setUploadMediaFiles(files);
-                setUploadMediaMetadata(meta || []);
-              }}
-              selectedFiles={uploadMediaFiles}
-              metadata={uploadMediaMetadata}
-            />
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <Label>Upload de Fotos e Vídeos</Label>
+              <BulkMediaUploader
+                onFilesChange={(files, meta) => {
+                  setUploadMediaFiles(files);
+                  setUploadMediaMetadata(meta || []);
+                }}
+                selectedFiles={uploadMediaFiles}
+                metadata={uploadMediaMetadata}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Vídeos do Google Drive</Label>
+              <Card className="p-4 bg-accent/5">
+                <ExternalVideoManager
+                  videos={uploadExternalVideos}
+                  onVideosChange={setUploadExternalVideos}
+                />
+              </Card>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -542,7 +581,7 @@ const Admin = () => {
             </Button>
             <Button
               onClick={handleUploadToExistingEvent}
-              disabled={uploading || uploadMediaFiles.length === 0}
+              disabled={uploading || (uploadMediaFiles.length === 0 && uploadExternalVideos.length === 0)}
             >
               {uploading ? (
                 <>
@@ -552,7 +591,7 @@ const Admin = () => {
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Enviar {uploadMediaFiles.length} arquivo(s)
+                  Enviar {uploadMediaFiles.length + uploadExternalVideos.length} item(s)
                 </>
               )}
             </Button>
