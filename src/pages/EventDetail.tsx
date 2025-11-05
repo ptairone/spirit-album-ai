@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Download, Image as ImageIcon, Video as VideoIcon, ExternalLink } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { format } from "date-fns";
@@ -116,6 +117,9 @@ const EventDetail = () => {
     setIsFiltering(false);
   };
 
+  const photos = filteredMedia.filter(m => m.file_type === 'photo');
+  const videos = filteredMedia.filter(m => m.file_type === 'video');
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -203,74 +207,136 @@ const EventDetail = () => {
           </Card>
         )}
 
-        {filteredMedia.length === 0 ? (
-          <Card className="text-center py-12 animate-fade-in">
-            <div className="flex flex-col items-center space-y-4">
-              <ImageIcon className="h-16 w-16 text-muted-foreground" />
-              <p className="text-lg text-muted-foreground">
-                {isFiltering ? 'Nenhuma foto encontrada com essa busca' : 'Nenhuma foto ou vídeo adicionado ainda'}
-              </p>
-            </div>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredMedia.map((item, index) => (
-              <div
-                key={item.id}
-                className={`relative group cursor-pointer animate-fade-in ${
-                  selectedMedia.includes(item.id) ? 'ring-2 ring-primary' : ''
-                }`}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <div
-                  className="aspect-square overflow-hidden rounded-lg bg-muted"
-                  onClick={() => {
-                    if (item.is_external && item.file_type === 'video') {
-                      window.open(item.file_url, '_blank');
-                    } else {
-                      openViewer(index);
-                    }
-                  }}
-                >
-                  {item.file_type === 'photo' ? (
-                    <img
-                      src={item.thumbnail_url || item.file_url}
-                      alt="Media"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-smooth"
-                    />
-                  ) : item.is_external ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 p-4 text-white">
-                      <ExternalLink className="h-12 w-12 mb-2" />
-                      <p className="text-xs font-medium text-center break-words">{item.name || 'Vídeo Externo'}</p>
-                      <p className="text-xs opacity-80 mt-1">Google Drive</p>
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-black">
-                      <VideoIcon className="h-12 w-12 text-white" />
-                    </div>
-                  )}
+        <Tabs defaultValue="photos" className="w-full">
+          <TabsList className="w-full justify-start mb-6">
+            <TabsTrigger value="photos" className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Fotos ({photos.length})
+            </TabsTrigger>
+            <TabsTrigger value="videos" className="flex items-center gap-2">
+              <VideoIcon className="h-4 w-4" />
+              Vídeos ({videos.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="photos">
+            {photos.length === 0 ? (
+              <Card className="text-center py-12 animate-fade-in">
+                <div className="flex flex-col items-center space-y-4">
+                  <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                  <p className="text-lg text-muted-foreground">
+                    {isFiltering ? 'Nenhuma foto encontrada com essa busca' : 'Nenhuma foto adicionada ainda'}
+                  </p>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleMediaSelection(item.id);
-                  }}
-                  className={`absolute top-2 right-2 w-6 h-6 rounded border-2 transition-smooth ${
-                    selectedMedia.includes(item.id)
-                      ? 'bg-primary border-primary'
-                      : 'bg-white/80 border-white/80 hover:bg-primary hover:border-primary'
-                  }`}
-                >
-                  {selectedMedia.includes(item.id) && (
-                    <svg className="w-full h-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {photos.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`relative group cursor-pointer animate-fade-in ${
+                      selectedMedia.includes(item.id) ? 'ring-2 ring-primary' : ''
+                    }`}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
+                    <div
+                      className="aspect-square overflow-hidden rounded-lg bg-muted"
+                      onClick={() => openViewer(media.indexOf(item))}
+                    >
+                      <img
+                        src={item.thumbnail_url || item.file_url}
+                        alt="Media"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-smooth"
+                      />
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMediaSelection(item.id);
+                      }}
+                      className={`absolute top-2 right-2 w-6 h-6 rounded border-2 transition-smooth ${
+                        selectedMedia.includes(item.id)
+                          ? 'bg-primary border-primary'
+                          : 'bg-white/80 border-white/80 hover:bg-primary hover:border-primary'
+                      }`}
+                    >
+                      {selectedMedia.includes(item.id) && (
+                        <svg className="w-full h-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </TabsContent>
+
+          <TabsContent value="videos">
+            {videos.length === 0 ? (
+              <Card className="text-center py-12 animate-fade-in">
+                <div className="flex flex-col items-center space-y-4">
+                  <VideoIcon className="h-16 w-16 text-muted-foreground" />
+                  <p className="text-lg text-muted-foreground">
+                    Nenhum vídeo adicionado ainda
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {videos.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`relative group cursor-pointer animate-fade-in ${
+                      selectedMedia.includes(item.id) ? 'ring-2 ring-primary' : ''
+                    }`}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
+                    <div
+                      className="aspect-square overflow-hidden rounded-lg bg-muted"
+                      onClick={() => {
+                        if (item.is_external) {
+                          window.open(item.file_url, '_blank');
+                        } else {
+                          openViewer(media.indexOf(item));
+                        }
+                      }}
+                    >
+                      {item.is_external ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 p-4 text-white">
+                          <ExternalLink className="h-12 w-12 mb-2" />
+                          <p className="text-xs font-medium text-center break-words">{item.name || 'Vídeo Externo'}</p>
+                          <p className="text-xs opacity-80 mt-1">Google Drive</p>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-black">
+                          <VideoIcon className="h-12 w-12 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMediaSelection(item.id);
+                      }}
+                      className={`absolute top-2 right-2 w-6 h-6 rounded border-2 transition-smooth ${
+                        selectedMedia.includes(item.id)
+                          ? 'bg-primary border-primary'
+                          : 'bg-white/80 border-white/80 hover:bg-primary hover:border-primary'
+                      }`}
+                    >
+                      {selectedMedia.includes(item.id) && (
+                        <svg className="w-full h-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       <MediaViewer
