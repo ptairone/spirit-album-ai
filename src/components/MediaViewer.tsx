@@ -77,17 +77,31 @@ const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }:
               {currentMedia.description && (
                 <p className="text-white/80 mb-6">{currentMedia.description}</p>
               )}
-              <p className="text-white/60 mb-6">
+              <p className="text-white/60 mb-4">
                 Este vídeo está hospedado no Google Drive
               </p>
-              <Button
-                size="lg"
-                onClick={() => window.open(currentMedia.file_url, '_blank')}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <ExternalLink className="h-5 w-5 mr-2" />
-                Abrir no Google Drive
-              </Button>
+              <p className="text-white/50 text-sm mb-6">
+                Nota: O arquivo precisa estar público no Google Drive para download direto
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  size="lg"
+                  onClick={handleDownload}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Download className="h-5 w-5 mr-2" />
+                  Baixar Vídeo
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => window.open(currentMedia.file_url, '_blank')}
+                  className="bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                >
+                  <ExternalLink className="h-5 w-5 mr-2" />
+                  Abrir no Drive
+                </Button>
+              </div>
             </div>
           ) : (
             <video

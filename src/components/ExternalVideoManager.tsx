@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { X, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { convertGoogleDriveLink } from "@/lib/utils";
 
 export interface ExternalVideo {
   id: string;
@@ -50,7 +51,7 @@ export const ExternalVideoManager = ({
     const newVideo: ExternalVideo = {
       id: crypto.randomUUID(),
       name: name.trim(),
-      driveLink: driveLink.trim(),
+      driveLink: convertGoogleDriveLink(driveLink.trim()),
       description: description.trim() || undefined,
     };
 
