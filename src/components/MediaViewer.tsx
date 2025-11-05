@@ -1,12 +1,15 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, X, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Download, ExternalLink } from "lucide-react";
 
 interface Media {
   id: string;
   file_url: string;
   file_type: string;
   thumbnail_url: string;
+  is_external?: boolean;
+  name?: string;
+  description?: string;
 }
 
 interface MediaViewerProps {
@@ -65,6 +68,27 @@ const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }:
               alt="Media"
               className="max-w-full max-h-full object-contain"
             />
+          ) : currentMedia.is_external ? (
+            <div className="max-w-2xl mx-auto p-8 bg-white/10 rounded-lg text-center">
+              <ExternalLink className="h-16 w-16 text-white mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-white mb-2">
+                {currentMedia.name || 'Vídeo Externo'}
+              </h3>
+              {currentMedia.description && (
+                <p className="text-white/80 mb-6">{currentMedia.description}</p>
+              )}
+              <p className="text-white/60 mb-6">
+                Este vídeo está hospedado no Google Drive
+              </p>
+              <Button
+                size="lg"
+                onClick={() => window.open(currentMedia.file_url, '_blank')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <ExternalLink className="h-5 w-5 mr-2" />
+                Abrir no Google Drive
+              </Button>
+            </div>
           ) : (
             <video
               src={currentMedia.file_url}

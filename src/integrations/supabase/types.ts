@@ -87,9 +87,10 @@ export type Database = {
           event_id: string
           file_size: number | null
           file_type: string
-          file_url: string
+          file_url: string | null
           height: number | null
           id: string
+          is_external: boolean | null
           name: string | null
           thumbnail_url: string | null
           uploaded_by: string
@@ -102,9 +103,10 @@ export type Database = {
           event_id: string
           file_size?: number | null
           file_type: string
-          file_url: string
+          file_url?: string | null
           height?: number | null
           id?: string
+          is_external?: boolean | null
           name?: string | null
           thumbnail_url?: string | null
           uploaded_by: string
@@ -117,9 +119,10 @@ export type Database = {
           event_id?: string
           file_size?: number | null
           file_type?: string
-          file_url?: string
+          file_url?: string | null
           height?: number | null
           id?: string
+          is_external?: boolean | null
           name?: string | null
           thumbnail_url?: string | null
           uploaded_by?: string

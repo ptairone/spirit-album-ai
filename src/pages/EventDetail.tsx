@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Calendar, Download, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
+import { Calendar, Download, Image as ImageIcon, Video as VideoIcon, ExternalLink } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +25,9 @@ interface Media {
   file_type: string;
   thumbnail_url: string;
   created_at: string;
+  is_external?: boolean;
+  name?: string;
+  description?: string;
 }
 
 const EventDetail = () => {
@@ -221,7 +224,13 @@ const EventDetail = () => {
               >
                 <div
                   className="aspect-square overflow-hidden rounded-lg bg-muted"
-                  onClick={() => openViewer(index)}
+                  onClick={() => {
+                    if (item.is_external && item.file_type === 'video') {
+                      window.open(item.file_url, '_blank');
+                    } else {
+                      openViewer(index);
+                    }
+                  }}
                 >
                   {item.file_type === 'photo' ? (
                     <img
@@ -229,6 +238,12 @@ const EventDetail = () => {
                       alt="Media"
                       className="w-full h-full object-cover group-hover:scale-105 transition-smooth"
                     />
+                  ) : item.is_external ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-blue-700 p-4 text-white">
+                      <ExternalLink className="h-12 w-12 mb-2" />
+                      <p className="text-xs font-medium text-center break-words">{item.name || 'Vídeo Externo'}</p>
+                      <p className="text-xs opacity-80 mt-1">Google Drive</p>
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-black">
                       <VideoIcon className="h-12 w-12 text-white" />

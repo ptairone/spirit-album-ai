@@ -11,6 +11,7 @@ import { Calendar, Upload, Loader2, CheckCircle2, ImagePlus, Trash2 } from "luci
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import BulkMediaUploader from "@/components/BulkMediaUploader";
+import { ExternalVideoManager, ExternalVideo } from "@/components/ExternalVideoManager";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -35,6 +36,9 @@ const Admin = () => {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadMediaFiles, setUploadMediaFiles] = useState<File[]>([]);
   const [uploadMediaMetadata, setUploadMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
+  
+  // External videos state
+  const [externalVideos, setExternalVideos] = useState<ExternalVideo[]>([]);
 
   useEffect(() => {
     checkAdminAccess();
@@ -298,6 +302,22 @@ const Admin = () => {
         }
       }
 
+      // Insert external videos from Google Drive
+      if (externalVideos.length > 0) {
+        const externalVideoInserts = externalVideos.map(video => ({
+          event_id: event.id,
+          file_url: video.driveLink,
+          file_type: 'video',
+          uploaded_by: session.user.id,
+          name: video.name,
+          description: video.description || null,
+          is_external: true
+        }));
+
+        await supabase.from('media').insert(externalVideoInserts);
+        toast.success(`${externalVideos.length} vídeo(s) do Google Drive adicionado(s)!`);
+      }
+
       toast.success("Evento criado com sucesso!");
       
       // Reset form
@@ -307,6 +327,7 @@ const Admin = () => {
       setCoverImage(null);
       setMediaFiles([]);
       setMediaMetadata([]);
+      setExternalVideos([]);
       setUploadProgress({});
       
       // Refresh events list
@@ -414,6 +435,16 @@ const Admin = () => {
                   selectedFiles={mediaFiles}
                   metadata={mediaMetadata}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Vídeos do Google Drive</Label>
+                <Card className="p-4 bg-accent/5">
+                  <ExternalVideoManager
+                    videos={externalVideos}
+                    onVideosChange={setExternalVideos}
+                  />
+                </Card>
               </div>
 
               <Button type="submit" className="w-full" disabled={uploading}>
