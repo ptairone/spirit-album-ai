@@ -13,6 +13,20 @@ import MediaViewer from "@/components/MediaViewer";
 import AIPhotoSearch from "@/components/AIPhotoSearch";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const getFileExtension = (mimeType: string): string => {
+  const extensions: { [key: string]: string } = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'video/mp4': '.mp4',
+    'video/quicktime': '.mov',
+    'video/x-msvideo': '.avi',
+  };
+  return extensions[mimeType] || '.jpg';
+};
+
 interface Event {
   id: string;
   title: string;
@@ -109,7 +123,15 @@ const EventDetail = () => {
         try {
           const response = await fetch(item.file_url);
           const blob = await response.blob();
-          const filename = item.name || `media-${mediaId}`;
+          
+          // Get file extension from blob type
+          const extension = getFileExtension(blob.type);
+          
+          // Create filename with proper extension
+          let filename = item.name || `foto-evento-${Date.now()}`;
+          if (!filename.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|avi)$/i)) {
+            filename += extension;
+          }
           
           // Use Web Share API on mobile for better gallery integration
           if (isMobile && navigator.share && navigator.canShare) {

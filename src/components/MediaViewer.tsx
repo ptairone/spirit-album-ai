@@ -5,6 +5,20 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const getFileExtension = (mimeType: string): string => {
+  const extensions: { [key: string]: string } = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'video/mp4': '.mp4',
+    'video/quicktime': '.mov',
+    'video/x-msvideo': '.avi',
+  };
+  return extensions[mimeType] || '.jpg';
+};
+
 interface Media {
   id: string;
   file_url: string;
@@ -47,9 +61,14 @@ const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }:
       const response = await fetch(currentMedia.file_url);
       const blob = await response.blob();
       
-      // Extract filename from URL or use a default
-      const urlParts = currentMedia.file_url.split('/');
-      const filename = currentMedia.name || urlParts[urlParts.length - 1] || `foto-${currentMedia.id}.jpg`;
+      // Get file extension from blob type
+      const extension = getFileExtension(blob.type);
+      
+      // Create filename with proper extension
+      let filename = currentMedia.name || `foto-evento-${Date.now()}`;
+      if (!filename.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|avi)$/i)) {
+        filename += extension;
+      }
       
       // Use Web Share API on mobile for better gallery integration
       if (isMobile && navigator.share && navigator.canShare) {
