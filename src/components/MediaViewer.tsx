@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X, Download, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Media {
   id: string;
@@ -24,6 +25,7 @@ interface MediaViewerProps {
 
 const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }: MediaViewerProps) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const isMobile = useIsMobile();
   
   if (media.length === 0) return null;
 
@@ -49,6 +51,24 @@ const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }:
       const urlParts = currentMedia.file_url.split('/');
       const filename = currentMedia.name || urlParts[urlParts.length - 1] || `foto-${currentMedia.id}.jpg`;
       
+      // Use Web Share API on mobile for better gallery integration
+      if (isMobile && navigator.share && navigator.canShare) {
+        const file = new File([blob], filename, { type: blob.type });
+        
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: currentMedia.name || 'Foto do evento'
+          });
+          
+          toast.dismiss();
+          toast.success("Compartilhado com sucesso!");
+          setIsDownloading(false);
+          return;
+        }
+      }
+      
+      // Fallback to traditional download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

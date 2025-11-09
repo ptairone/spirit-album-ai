@@ -11,6 +11,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import MediaViewer from "@/components/MediaViewer";
 import AIPhotoSearch from "@/components/AIPhotoSearch";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Event {
   id: string;
@@ -33,6 +34,7 @@ interface Media {
 
 const EventDetail = () => {
   const { id } = useParams();
+  const isMobile = useIsMobile();
   const [event, setEvent] = useState<Event | null>(null);
   const [media, setMedia] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,11 +109,27 @@ const EventDetail = () => {
         try {
           const response = await fetch(item.file_url);
           const blob = await response.blob();
+          const filename = item.name || `media-${mediaId}`;
+          
+          // Use Web Share API on mobile for better gallery integration
+          if (isMobile && navigator.share && navigator.canShare) {
+            const file = new File([blob], filename, { type: blob.type });
+            
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: item.name || 'Mídia do evento'
+              });
+              continue;
+            }
+          }
+          
+          // Fallback to traditional download
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.style.display = 'none';
           link.href = url;
-          link.download = item.name || `media-${mediaId}`;
+          link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
