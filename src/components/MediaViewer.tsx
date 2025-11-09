@@ -75,15 +75,25 @@ const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }:
         const file = new File([blob], filename, { type: blob.type });
         
         if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: currentMedia.name || 'Foto do evento'
+          toast.dismiss();
+          toast.info("📱 Clique em 'Salvar Imagem' no menu que aparece", {
+            duration: 5000,
           });
           
-          toast.dismiss();
-          toast.success("Compartilhado com sucesso!");
-          setIsDownloading(false);
-          return;
+          try {
+            await navigator.share({
+              files: [file],
+              title: currentMedia.name || 'Foto do evento'
+            });
+            setIsDownloading(false);
+            return;
+          } catch (error) {
+            if ((error as Error).name !== 'AbortError') {
+              console.error('Erro ao compartilhar:', error);
+            }
+            setIsDownloading(false);
+            return;
+          }
         }
       }
       
@@ -241,7 +251,7 @@ const MediaViewer = ({ media, currentIndex, open, onOpenChange, onIndexChange }:
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg transition-all hover:scale-105"
                 >
                   <Download className="h-5 w-5 mr-2" />
-                  {isDownloading ? "Baixando..." : "Baixar Foto"}
+                  {isDownloading ? "Carregando..." : (isMobile ? "Salvar na Galeria" : "Baixar Foto")}
                 </Button>
               )}
             </div>

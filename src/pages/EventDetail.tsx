@@ -109,49 +109,104 @@ const EventDetail = () => {
       return;
     }
 
-    toast.success(`Baixando ${selectedMedia.length} arquivo(s)...`);
-    
-    for (let i = 0; i < selectedMedia.length; i++) {
-      const mediaId = selectedMedia[i];
-      const item = media.find(m => m.id === mediaId);
-      if (item) {
-        // Pequeno delay entre downloads para evitar bloqueio do navegador
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      // Check if we're on mobile and can use Web Share API
+      if (isMobile && navigator.share && navigator.canShare) {
+        toast.info("📱 Para cada foto, clique em 'Salvar Imagem' no menu que aparece", {
+          duration: 6000,
+        });
+
+        for (let i = 0; i < selectedMedia.length; i++) {
+          const mediaId = selectedMedia[i];
+          const item = media.find(m => m.id === mediaId);
+          if (!item) continue;
+
+          toast.info(`Foto ${i + 1} de ${selectedMedia.length}`, {
+            duration: 3000,
+          });
+
+          try {
+            const response = await fetch(item.file_url);
+            const blob = await response.blob();
+            const extension = getFileExtension(blob.type);
+            
+            let filename = item.name || `foto-evento-${Date.now()}-${i + 1}`;
+            if (!filename.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|avi)$/i)) {
+              filename += extension;
+            }
+
+            const file = new File([blob], filename, { type: blob.type });
+            
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: `Foto ${i + 1} de ${selectedMedia.length}`
+              });
+              
+              // Wait before next share
+              if (i < selectedMedia.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+              }
+            }
+          } catch (error) {
+            if ((error as Error).name !== 'AbortError') {
+              console.error('Erro ao compartilhar:', error);
+            }
+            // Continue with next photo even if user cancels
+          }
+        }
+
+        toast.success(`Concluído! ${selectedMedia.length} foto(s) processada(s).`);
+        setSelectedMedia([]);
+      } else {
+        // Desktop: Traditional download
+        toast.success(`Baixando ${selectedMedia.length} arquivo(s)...`);
+        
+        for (let i = 0; i < selectedMedia.length; i++) {
+          const mediaId = selectedMedia[i];
+          const item = media.find(m => m.id === mediaId);
+          if (item) {
+            // Pequeno delay entre downloads para evitar bloqueio do navegador
+            if (i > 0) {
+              await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            
+            try {
+              const response = await fetch(item.file_url);
+              const blob = await response.blob();
+              
+              // Get file extension from blob type
+              const extension = getFileExtension(blob.type);
+              
+              // Create filename with proper extension
+              let filename = item.name || `foto-evento-${Date.now()}-${i + 1}`;
+              if (!filename.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|avi)$/i)) {
+                filename += extension;
+              }
+              
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.style.display = 'none';
+              link.href = url;
+              link.download = filename;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            } catch (error) {
+              console.error('Erro ao baixar:', error);
+              toast.error(`Erro ao baixar arquivo`);
+            }
+          }
         }
         
-        try {
-          const response = await fetch(item.file_url);
-          const blob = await response.blob();
-          
-          // Get file extension from blob type
-          const extension = getFileExtension(blob.type);
-          
-          // Create filename with proper extension
-          let filename = item.name || `foto-evento-${Date.now()}-${i + 1}`;
-          if (!filename.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|avi)$/i)) {
-            filename += extension;
-          }
-          
-          // Web Share API doesn't work well with multiple files
-          // Use traditional download for multiple selections
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.style.display = 'none';
-          link.href = url;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        } catch (error) {
-          console.error('Erro ao baixar:', error);
-          toast.error(`Erro ao baixar arquivo`);
-        }
+        toast.success('Download concluído!');
+        setSelectedMedia([]);
       }
+    } catch (error) {
+      console.error('Erro geral:', error);
+      toast.error('Erro ao processar as mídias');
     }
-    
-    toast.success('Download concluído!');
   };
 
   const openViewer = (index: number) => {
@@ -258,7 +313,7 @@ const EventDetail = () => {
                   onClick={handleDownloadSelected}
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Baixar Selecionadas
+                  {isMobile ? "Salvar Fotos" : "Baixar Selecionadas"}
                 </Button>
               </div>
             </div>
