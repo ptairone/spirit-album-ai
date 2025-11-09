@@ -19,16 +19,14 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const navigate = useNavigate();
 
-  // Event form state
+  // Create event dialog state
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
-  const [mediaMetadata, setMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
 
   // Existing events state
   const [events, setEvents] = useState<any[]>([]);
@@ -37,9 +35,6 @@ const Admin = () => {
   const [uploadMediaFiles, setUploadMediaFiles] = useState<File[]>([]);
   const [uploadMediaMetadata, setUploadMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
   const [uploadExternalVideos, setUploadExternalVideos] = useState<ExternalVideo[]>([]);
-  
-  // External videos state
-  const [externalVideos, setExternalVideos] = useState<ExternalVideo[]>([]);
 
   useEffect(() => {
     checkAdminAccess();
@@ -215,13 +210,7 @@ const Admin = () => {
     }
   };
 
-  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setMediaFiles(Array.from(e.target.files));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploading(true);
 
@@ -267,83 +256,6 @@ const Admin = () => {
 
       if (eventError) throw eventError;
 
-      // Upload media files with progress tracking
-      if (mediaFiles.length > 0) {
-        toast.info(`Enviando ${mediaFiles.length} arquivo(s)...`);
-        
-        let successCount = 0;
-        let errorCount = 0;
-
-        for (let i = 0; i < mediaFiles.length; i++) {
-          const file = mediaFiles[i];
-          const fileKey = `${file.name}-${i}`;
-          
-          try {
-            setUploadProgress(prev => ({ ...prev, [fileKey]: 0 }));
-
-            const fileExt = file.name.split('.').pop();
-            const filePath = `${event.id}/${Date.now()}-${file.name}`;
-            
-            const { data: fileData, error: uploadError } = await supabase.storage
-              .from('event-media')
-              .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            setUploadProgress(prev => ({ ...prev, [fileKey]: 50 }));
-
-            const { data: { publicUrl } } = supabase.storage
-              .from('event-media')
-              .getPublicUrl(fileData.path);
-
-            const fileType = file.type.startsWith('video/') ? 'video' : 'photo';
-            const meta = mediaMetadata[i] || {};
-
-            await supabase
-              .from('media')
-              .insert({
-                event_id: event.id,
-                file_url: publicUrl,
-                file_type: fileType,
-                file_size: file.size,
-                uploaded_by: session.user.id,
-                name: meta.name || null,
-                description: meta.description || null
-              });
-
-            setUploadProgress(prev => ({ ...prev, [fileKey]: 100 }));
-            successCount++;
-          } catch (error) {
-            console.error(`Erro ao enviar ${file.name}:`, error);
-            errorCount++;
-            setUploadProgress(prev => ({ ...prev, [fileKey]: -1 }));
-          }
-        }
-
-        if (successCount > 0) {
-          toast.success(`${successCount} arquivo(s) enviado(s) com sucesso!`);
-        }
-        if (errorCount > 0) {
-          toast.error(`${errorCount} arquivo(s) falharam no upload`);
-        }
-      }
-
-      // Insert external videos from Google Drive
-      if (externalVideos.length > 0) {
-        const externalVideoInserts = externalVideos.map(video => ({
-          event_id: event.id,
-          file_url: video.driveLink,
-          file_type: 'video',
-          uploaded_by: session.user.id,
-          name: video.name,
-          description: video.description || null,
-          is_external: true
-        }));
-
-        await supabase.from('media').insert(externalVideoInserts);
-        toast.success(`${externalVideos.length} vídeo(s) do Google Drive adicionado(s)!`);
-      }
-
       toast.success("Evento criado com sucesso!");
       
       // Reset form
@@ -351,16 +263,10 @@ const Admin = () => {
       setDescription("");
       setEventDate("");
       setCoverImage(null);
-      setMediaFiles([]);
-      setMediaMetadata([]);
-      setExternalVideos([]);
-      setUploadProgress({});
+      setIsCreateDialogOpen(false);
       
       // Refresh events list
       fetchEvents();
-      
-      // Navigate to the event
-      navigate(`/eventos/${event.id}`);
     } catch (error: any) {
       console.error('Error:', error);
       toast.error(error.message || "Erro ao criar evento");
@@ -386,136 +292,38 @@ const Admin = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="mb-8 animate-fade-in">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Administração</h1>
-          <p className="text-muted-foreground">
-            Crie eventos e faça upload de fotos e vídeos
-          </p>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="mb-8 animate-fade-in flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Eventos Criados</h1>
+            <p className="text-muted-foreground">
+              Gerencie os eventos e suas mídias
+            </p>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)} size="lg">
+            <Calendar className="mr-2 h-5 w-5" />
+            Criar Novo Evento
+          </Button>
         </div>
 
-        <Card className="shadow-medium animate-fade-in">
-          <CardHeader>
-            <CardTitle>Criar Novo Evento</CardTitle>
-            <CardDescription>
-              Preencha os dados do evento de batismo
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="title">Título do Evento *</Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ex: Batismo - Janeiro 2024"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Descreva o evento..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="eventDate">Data do Evento *</Label>
-                <Input
-                  id="eventDate"
-                  type="date"
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="coverImage">Imagem de Capa</Label>
-                <Input
-                  id="coverImage"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCoverImageChange}
-                />
-                {coverImage && (
-                  <p className="text-sm text-muted-foreground">
-                    Selecionado: {coverImage.name}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Fotos e Vídeos em Massa</Label>
-                <BulkMediaUploader
-                  onFilesChange={(files, meta) => {
-                    setMediaFiles(files);
-                    setMediaMetadata(meta || []);
-                  }}
-                  selectedFiles={mediaFiles}
-                  metadata={mediaMetadata}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Vídeos do Google Drive</Label>
-                <Card className="p-4 bg-accent/5">
-                  <ExternalVideoManager
-                    videos={externalVideos}
-                    onVideosChange={setExternalVideos}
-                  />
-                </Card>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={uploading}>
-                {uploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Criar Evento
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Existing Events */}
-        {events.length > 0 && (
-          <Card className="mt-8 shadow-medium animate-fade-in">
-            <CardHeader>
-              <CardTitle>Eventos Criados</CardTitle>
-              <CardDescription>
-                Adicione mídias ou gerencie eventos existentes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                  >
+        {events.length > 0 ? (
+          <div className="space-y-4 animate-fade-in">
+            {events.map((event) => (
+              <Card key={event.id} className="shadow-medium hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <h3 className="font-semibold">{event.title}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <h3 className="text-xl font-semibold mb-1">{event.title}</h3>
+                      <p className="text-sm text-muted-foreground mb-2">
                         {format(new Date(event.event_date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                       </p>
+                      {event.description && (
+                        <p className="text-sm text-muted-foreground">{event.description}</p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        size="sm"
                         onClick={() => openUploadDialog(event)}
                       >
                         <ImagePlus className="h-4 w-4 mr-2" />
@@ -523,19 +331,119 @@ const Admin = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleDeleteEvent(event.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="shadow-medium animate-fade-in">
+            <CardContent className="p-12 text-center">
+              <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">Nenhum evento criado</h3>
+              <p className="text-muted-foreground mb-4">
+                Crie seu primeiro evento para começar
+              </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Criar Primeiro Evento
+              </Button>
             </CardContent>
           </Card>
         )}
       </div>
+
+      {/* Create Event Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Criar Novo Evento</DialogTitle>
+            <DialogDescription>
+              Preencha as informações básicas do evento
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleCreateEvent} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Título do Evento *</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: Batismo - Janeiro 2024"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descreva o evento..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="eventDate">Data do Evento *</Label>
+              <Input
+                id="eventDate"
+                type="date"
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="coverImage">Imagem de Capa</Label>
+              <Input
+                id="coverImage"
+                type="file"
+                accept="image/*"
+                onChange={handleCoverImageChange}
+              />
+              {coverImage && (
+                <p className="text-sm text-muted-foreground">
+                  Selecionado: {coverImage.name}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateDialogOpen(false)}
+                disabled={uploading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={uploading}>
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Criar Evento
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Upload to Existing Event Dialog */}
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
