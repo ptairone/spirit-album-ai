@@ -97,7 +97,7 @@ const AIPhotoSearch = ({ eventId, onSearchResults }: AIPhotoSearchProps) => {
               <label htmlFor="search-image" className="cursor-pointer">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-smooth">
                   <Upload className="h-4 w-4" />
-                  <span>Ou faça upload de uma foto similar</span>
+                  <span>Ou faça upload de uma foto do rosto para busca automática</span>
                 </div>
                 <input
                   id="search-image"
