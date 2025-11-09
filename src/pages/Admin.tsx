@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Upload, Loader2, CheckCircle2, ImagePlus, Trash2 } from "lucide-react";
+import { Calendar, Upload, Loader2, CheckCircle2, ImagePlus, Trash2, Pencil } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import BulkMediaUploader from "@/components/BulkMediaUploader";
@@ -35,6 +35,13 @@ const Admin = () => {
   const [uploadMediaFiles, setUploadMediaFiles] = useState<File[]>([]);
   const [uploadMediaMetadata, setUploadMediaMetadata] = useState<{ name?: string; description?: string }[]>([]);
   const [uploadExternalVideos, setUploadExternalVideos] = useState<ExternalVideo[]>([]);
+
+  // Edit event dialog state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editEventDate, setEditEventDate] = useState("");
+  const [editCoverImage, setEditCoverImage] = useState<File | null>(null);
 
   useEffect(() => {
     checkAdminAccess();
@@ -104,6 +111,76 @@ const Admin = () => {
     setUploadMediaMetadata([]);
     setUploadExternalVideos([]);
     setIsUploadDialogOpen(true);
+  };
+
+  const openEditDialog = (event: any) => {
+    setSelectedEvent(event);
+    setEditTitle(event.title);
+    setEditDescription(event.description || "");
+    setEditEventDate(event.event_date);
+    setEditCoverImage(null);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setEditCoverImage(e.target.files[0]);
+    }
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEvent) return;
+
+    setUploading(true);
+    try {
+      let coverImageUrl = selectedEvent.cover_image_url;
+
+      // Upload new cover image if selected
+      if (editCoverImage) {
+        const coverExt = editCoverImage.name.split('.').pop();
+        const coverPath = `${Date.now()}-cover.${coverExt}`;
+        
+        const { data: coverData, error: coverError } = await supabase.storage
+          .from('event-media')
+          .upload(coverPath, editCoverImage);
+
+        if (coverError) throw coverError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('event-media')
+          .getPublicUrl(coverData.path);
+        
+        coverImageUrl = publicUrl;
+      }
+
+      // Update event
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({
+          title: editTitle,
+          description: editDescription,
+          event_date: editEventDate,
+          cover_image_url: coverImageUrl
+        })
+        .eq('id', selectedEvent.id);
+
+      if (updateError) throw updateError;
+
+      toast.success("Evento atualizado com sucesso!");
+      setIsEditDialogOpen(false);
+      setEditTitle("");
+      setEditDescription("");
+      setEditEventDate("");
+      setEditCoverImage(null);
+      setSelectedEvent(null);
+      fetchEvents();
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast.error(error.message || "Erro ao atualizar evento");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleUploadToExistingEvent = async () => {
@@ -324,6 +401,14 @@ const Admin = () => {
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(event)}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => openUploadDialog(event)}
                       >
                         <ImagePlus className="h-4 w-4 mr-2" />
@@ -437,6 +522,97 @@ const Admin = () => {
                   <>
                     <Calendar className="mr-2 h-4 w-4" />
                     Criar Evento
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Event Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Evento</DialogTitle>
+            <DialogDescription>
+              Atualize as informações do evento
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleUpdateEvent} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editTitle">Título do Evento *</Label>
+              <Input
+                id="editTitle"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Ex: Batismo - Janeiro 2024"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editDescription">Descrição</Label>
+              <Textarea
+                id="editDescription"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Descreva o evento..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editEventDate">Data do Evento *</Label>
+              <Input
+                id="editEventDate"
+                type="date"
+                value={editEventDate}
+                onChange={(e) => setEditEventDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editCoverImage">Nova Imagem de Capa</Label>
+              <Input
+                id="editCoverImage"
+                type="file"
+                accept="image/*"
+                onChange={handleEditCoverImageChange}
+              />
+              {editCoverImage && (
+                <p className="text-sm text-muted-foreground">
+                  Selecionado: {editCoverImage.name}
+                </p>
+              )}
+              {selectedEvent?.cover_image_url && !editCoverImage && (
+                <p className="text-sm text-muted-foreground">
+                  Mantendo imagem atual
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={uploading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={uploading}>
+                {uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Atualizando...
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Atualizar Evento
                   </>
                 )}
               </Button>
