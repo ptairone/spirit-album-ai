@@ -128,25 +128,13 @@ const EventDetail = () => {
           const extension = getFileExtension(blob.type);
           
           // Create filename with proper extension
-          let filename = item.name || `foto-evento-${Date.now()}`;
+          let filename = item.name || `foto-evento-${Date.now()}-${i + 1}`;
           if (!filename.match(/\.(jpg|jpeg|png|webp|gif|mp4|mov|avi)$/i)) {
             filename += extension;
           }
           
-          // Use Web Share API on mobile for better gallery integration
-          if (isMobile && navigator.share && navigator.canShare) {
-            const file = new File([blob], filename, { type: blob.type });
-            
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: item.name || 'Mídia do evento'
-              });
-              continue;
-            }
-          }
-          
-          // Fallback to traditional download
+          // Web Share API doesn't work well with multiple files
+          // Use traditional download for multiple selections
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.style.display = 'none';
@@ -252,7 +240,7 @@ const EventDetail = () => {
         )}
 
         {selectedMedia.length > 0 && (
-          <Card className="p-4 mb-6 animate-fade-in">
+          <Card className="sticky top-0 z-10 p-4 mb-6 animate-fade-in bg-background shadow-lg">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <p className="text-sm font-medium">
                 {selectedMedia.length} mídia(s) selecionada(s)
