@@ -83,17 +83,47 @@ const EventDetail = () => {
       return;
     }
 
+    const externalMedia = selectedMedia.filter(id => {
+      const item = media.find(m => m.id === id);
+      return item?.is_external;
+    });
+
+    if (externalMedia.length > 0) {
+      toast.error("Vídeos externos do Google Drive não podem ser baixados automaticamente");
+      return;
+    }
+
     toast.success(`Baixando ${selectedMedia.length} arquivo(s)...`);
     
-    for (const mediaId of selectedMedia) {
+    for (let i = 0; i < selectedMedia.length; i++) {
+      const mediaId = selectedMedia[i];
       const item = media.find(m => m.id === mediaId);
       if (item) {
-        const link = document.createElement('a');
-        link.href = item.file_url;
-        link.download = `media-${mediaId}`;
-        link.click();
+        // Pequeno delay entre downloads para evitar bloqueio do navegador
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
+        try {
+          const response = await fetch(item.file_url);
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.style.display = 'none';
+          link.href = url;
+          link.download = item.name || `media-${mediaId}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Erro ao baixar:', error);
+          toast.error(`Erro ao baixar arquivo`);
+        }
       }
     }
+    
+    toast.success('Download concluído!');
   };
 
   const openViewer = (index: number) => {
